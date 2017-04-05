@@ -2,7 +2,9 @@ package modteam.login.api;
 
 import java.util.HashMap;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -26,11 +28,11 @@ import modteam.login.common.model.LoginResponse;
 @RequestMapping("/api")
 public class LoginController {
 
-	private static final String AWS_ACCOUNT_ID = "AWS_ACCOUNT_ID";
-	private static final String AWS_COGNITO_IDENTITY_POOL_ID = "AWS_COGNITO_IDENTITY_POOL_ID";
+	@Autowired
+	private Environment env;
 
 	@RequestMapping(method = RequestMethod.POST, produces = "application/json")
-	public @ResponseBody LoginResponse authenticateUser(@RequestBody String request) {
+	public @ResponseBody LoginResponse authenticateUser(@RequestBody String token) {
 
 		AWSCredentials awsCredentials = new AnonymousAWSCredentials();
 		Regions region = Regions.US_WEST_2;
@@ -41,12 +43,12 @@ public class LoginController {
 		// send a get id request. This only needs to be executed the first time
 		// and the result should be cached.
 		GetIdRequest idRequest = new GetIdRequest();
-		idRequest.setAccountId(System.getenv(AWS_ACCOUNT_ID));
-		idRequest.setIdentityPoolId(System.getenv(AWS_COGNITO_IDENTITY_POOL_ID));
+		idRequest.setAccountId(env.getProperty("AWS_ACCOUNT_ID"));
+		idRequest.setIdentityPoolId(env.getProperty("AWS_COGNITO_IDENTITY_POOL_ID"));
 		// If you are authenticating your users through an identity provider
 		// then you can set the Map of tokens in the request
 		HashMap<String, String> providerTokens = new HashMap<String, String>();
-		providerTokens.put("graph.facebook.com", "facebook session key");
+		providerTokens.put("graph.facebook.com", token);
 		idRequest.setLogins(providerTokens);
 
 		GetIdResult idResp = identityClient.getId(idRequest);
