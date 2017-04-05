@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.AWSStaticCredentialsProvider;
 import com.amazonaws.auth.AnonymousAWSCredentials;
+import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.regions.Regions;
 //import the required packages from the AWS SDK for Java
 import com.amazonaws.services.cognitoidentity.AmazonCognitoIdentity;
@@ -34,7 +35,9 @@ public class LoginController {
 	@RequestMapping(method = RequestMethod.POST, produces = "application/json")
 	public @ResponseBody LoginResponse authenticateUser(@RequestBody String token) {
 
-		AWSCredentials awsCredentials = new AnonymousAWSCredentials();
+		AWSCredentials awsCredentials = new BasicAWSCredentials(env.getProperty("ACCESS_KEY"),
+				env.getProperty("SECRET_KEY"));
+		;
 		Regions region = Regions.US_WEST_2;
 		// initialize the Cognito identity client
 		AmazonCognitoIdentity identityClient = AmazonCognitoIdentityClientBuilder.standard().withRegion(region)
@@ -51,6 +54,7 @@ public class LoginController {
 		providerTokens.put("graph.facebook.com", token);
 		idRequest.setLogins(providerTokens);
 
+		System.err.println(token);
 		GetIdResult idResp = identityClient.getId(idRequest);
 
 		String identityId = idResp.getIdentityId();
