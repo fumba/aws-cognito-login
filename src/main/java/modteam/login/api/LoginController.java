@@ -1,26 +1,26 @@
 package modteam.login.api;
 
+/**
+ * 
+ * @author fchibaka
+ */
 import java.util.HashMap;
+import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
-import com.amazonaws.ClientConfiguration;
 import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.AWSStaticCredentialsProvider;
-import com.amazonaws.auth.AnonymousAWSCredentials;
 import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.regions.Regions;
-//import the required packages from the AWS SDK for Java
 import com.amazonaws.services.cognitoidentity.AmazonCognitoIdentity;
-import com.amazonaws.services.cognitoidentity.AmazonCognitoIdentityClient;
 import com.amazonaws.services.cognitoidentity.AmazonCognitoIdentityClientBuilder;
 import com.amazonaws.services.cognitoidentity.model.GetIdRequest;
 import com.amazonaws.services.cognitoidentity.model.GetIdResult;
@@ -34,39 +34,48 @@ public class LoginController {
 
 	@Autowired
 	private Environment env;
-
 	private final String GOOGLE_AUTH_PROVIDER_NAME = "accounts.google.com";
+	private Map<String, String> accessCache = new HashMap<String, String>();
+	private LoginResponse response;
+	private GetIdResult idResp;
 
 	@RequestMapping(method = RequestMethod.POST, produces = "application/json")
 	public @ResponseBody LoginResponse authenticateUser(@RequestParam String token) {
+		response = new LoginResponse();
+		if (accessCache.containsKey(token)) {
+			response.setStatus(true);
+		} else {
+			AWSCredentials awsCredentials = new BasicAWSCredentials(env.getProperty("ACCESS_KEY"),
+					env.getProperty("SECRET_KEY"));
 
-		AWSCredentials awsCredentials = new BasicAWSCredentials(env.getProperty("ACCESS_KEY"),
-				env.getProperty("SECRET_KEY"));
-		;
-		Regions region = Regions.US_WEST_2;
-		// initialize the Cognito identity client
-		AmazonCognitoIdentity identityClient = AmazonCognitoIdentityClientBuilder.standard().withRegion(region)
-				.withCredentials(new AWSStaticCredentialsProvider(awsCredentials)).build();
+			Regions region = Regions.US_WEST_2;
+			// initialize the cognito identity client
+			AmazonCognitoIdentity identityClient = AmazonCognitoIdentityClientBuilder.standard().withRegion(region)
+					.withCredentials(new AWSStaticCredentialsProvider(awsCredentials)).build();
+			// send a get id request. This only needs to be executed the first
+			// time and the result should be cached.
+			GetIdRequest idRequest = new GetIdRequest();
+			idRequest.setAccountId(env.getProperty("AWS_ACCOUNT_ID"));
+			idRequest.setIdentityPoolId(env.getProperty("AWS_COGNITO_IDENTITY_POOL_ID"));
 
-		// send a get id request. This only needs to be executed the first time
-		// and the result should be cached.
-		GetIdRequest idRequest = new GetIdRequest();
-		idRequest.setAccountId(env.getProperty("AWS_ACCOUNT_ID"));
-		idRequest.setIdentityPoolId(env.getProperty("AWS_COGNITO_IDENTITY_POOL_ID"));
-		// If you are authenticating your users through an identity provider
-		// then you can set the Map of tokens in the request
-		HashMap<String, String> providerTokens = new HashMap<String, String>();
-		providerTokens.put(GOOGLE_AUTH_PROVIDER_NAME, token);
-		idRequest.setLogins(providerTokens);
+			// google- identity provider
+			HashMap<String, String> providerTokens = new HashMap<String, String>();
+			providerTokens.put(GOOGLE_AUTH_PROVIDER_NAME, token);
+			idRequest.setLogins(providerTokens);
 
-		GetIdResult idResp = identityClient.getId(idRequest);
+			try {
+				idResp = identityClient.getId(idRequest);
+			} catch (Exception e) {
+				response.setStatus(false);
+			}
 
-		String identityId = idResp.getIdentityId();
+			// save identifier to cache
+			String identityId = idResp.getIdentityId();
+			accessCache.put(token, identityId);
+			response.setStatus(true);
+		}
 
-		// TODO: At this point you should save this identifier so you won't
-		// have to make this call the next time a user connects
-
-		return new LoginResponse();
+		return response;
 	}
 
 }
