@@ -9,8 +9,10 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
+import com.amazonaws.ClientConfiguration;
 import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.AWSStaticCredentialsProvider;
 import com.amazonaws.auth.AnonymousAWSCredentials;
@@ -18,6 +20,7 @@ import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.regions.Regions;
 //import the required packages from the AWS SDK for Java
 import com.amazonaws.services.cognitoidentity.AmazonCognitoIdentity;
+import com.amazonaws.services.cognitoidentity.AmazonCognitoIdentityClient;
 import com.amazonaws.services.cognitoidentity.AmazonCognitoIdentityClientBuilder;
 import com.amazonaws.services.cognitoidentity.model.GetIdRequest;
 import com.amazonaws.services.cognitoidentity.model.GetIdResult;
@@ -32,8 +35,10 @@ public class LoginController {
 	@Autowired
 	private Environment env;
 
+	private final String GOOGLE_AUTH_PROVIDER_NAME = "accounts.google.com";
+
 	@RequestMapping(method = RequestMethod.POST, produces = "application/json")
-	public @ResponseBody LoginResponse authenticateUser(@RequestBody String token) {
+	public @ResponseBody LoginResponse authenticateUser(@RequestParam String token) {
 
 		AWSCredentials awsCredentials = new BasicAWSCredentials(env.getProperty("ACCESS_KEY"),
 				env.getProperty("SECRET_KEY"));
@@ -51,14 +56,12 @@ public class LoginController {
 		// If you are authenticating your users through an identity provider
 		// then you can set the Map of tokens in the request
 		HashMap<String, String> providerTokens = new HashMap<String, String>();
-		providerTokens.put("graph.facebook.com", token);
+		providerTokens.put(GOOGLE_AUTH_PROVIDER_NAME, token);
 		idRequest.setLogins(providerTokens);
 
-		System.err.println(token);
 		GetIdResult idResp = identityClient.getId(idRequest);
 
 		String identityId = idResp.getIdentityId();
-		System.out.println(identityId);
 
 		// TODO: At this point you should save this identifier so you won't
 		// have to make this call the next time a user connects
