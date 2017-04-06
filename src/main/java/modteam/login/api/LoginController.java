@@ -1,8 +1,9 @@
 package modteam.login.api;
 
 /**
+ * Federated identities - Provides identity for users logged in using a provider. 
  * 
- * @author fchibaka
+ * @author Fumba Chibaka, Pramod Jakkannavar
  */
 import java.util.HashMap;
 import java.util.Map;
@@ -35,13 +36,20 @@ public class LoginController {
 	@Autowired
 	private Environment env;
 	private final String GOOGLE_AUTH_PROVIDER_NAME = "accounts.google.com";
+	private final String FACEBOOK_AUTH_PROVIDER_NAME = "graph.facebook.com";
+	private final String GOOGLE = "google";
+	private final String FACEBOOK = "facebook";
 	private Map<String, String> accessCache = new HashMap<String, String>();
 	private LoginResponse response;
 	private GetIdResult idResp;
 
 	@RequestMapping(method = RequestMethod.POST, produces = "application/json")
-	public @ResponseBody LoginResponse authenticateUser(@RequestParam String token) {
+	public @ResponseBody LoginResponse authenticateUser(@RequestParam String token, @RequestParam String provider) {
+
 		response = new LoginResponse();
+		response.setProviderName(provider);
+		response.setErrorMessage("");
+
 		if (accessCache.containsKey(token)) {
 			response.setStatus(true);
 		} else {
@@ -60,21 +68,27 @@ public class LoginController {
 
 			// google- identity provider
 			HashMap<String, String> providerTokens = new HashMap<String, String>();
-			providerTokens.put(GOOGLE_AUTH_PROVIDER_NAME, token);
+			if (provider.equals(GOOGLE)) {
+				providerTokens.put(GOOGLE_AUTH_PROVIDER_NAME, token);
+			} else if (provider.equals(FACEBOOK)) {
+				providerTokens.put(FACEBOOK_AUTH_PROVIDER_NAME, token);
+			} else {
+				response.setErrorMessage("Provider name needs to be specified.");
+				return response;
+			}
 			idRequest.setLogins(providerTokens);
 
 			try {
 				idResp = identityClient.getId(idRequest);
+				// save identifier to cache
+				String identityId = idResp.getIdentityId();
+				accessCache.put(token, identityId);
+				response.setStatus(true);
 			} catch (Exception e) {
 				response.setStatus(false);
+				response.setErrorMessage(e.getMessage());
 			}
-
-			// save identifier to cache
-			String identityId = idResp.getIdentityId();
-			accessCache.put(token, identityId);
-			response.setStatus(true);
 		}
-
 		return response;
 	}
 
